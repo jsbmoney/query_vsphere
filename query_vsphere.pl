@@ -4,33 +4,19 @@ use strict;
 use Data::Dumper;
 use VMware::VIRuntime;
 
-my %opts = (
-	entity => {
-		type => "=s",
-		variable => "VI_ENTITY",
-		help => "ManagedEntity type: HostSystem, etc",
-		required => 1,
-	}
-);
-
-my $log = "C:\\temp\\vmapi.txt";
-open (LOG, ">$log") or die "Unable to open $log\n";
-
 my $ESX = {};
 my $DATASTORE = {};
 my $VM = ();
  
 my $debug = 1;
 
-Opts::add_options(%opts);
 Opts::parse();
 Opts::validate();
-
 Util::connect();
 
+my $log = "C:\\temp\\vmapi.txt";
+open (LOG, ">$log") or die "Unable to open $log\n";
 
-my $entity_type = Opts::get_option('entity');
-print "finding $entity_type entities...\n";
 
 sub get_esx_host_list {
 
@@ -124,11 +110,6 @@ sub convert_capacity {
 
 sub get_datastore_vms {
 
-# ----------------------- Datastore ---------------------------------------------------
-#
-# objective: determine which vms are stored on which datastores
-#
-# ----------------------- Datastore ---------------------------------------------------
 
 	my ($esxhost, $ds_name) = @_;
 
