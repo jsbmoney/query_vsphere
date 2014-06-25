@@ -20,13 +20,13 @@ open (LOG, ">$log") or die "Unable to open $log\n";
 
 sub get_esx_host_list {
 
-	my $entity_views = Vim::find_entity_views(
+	my $host_entity_views = Vim::find_entity_views(
 		view_type => 'HostSystem'
 	);
 
-	foreach my $entity_view (@$entity_views) {
-		printf("%30s\n", $entity_view->name);
-		$ESX->{$entity_view->name} = {};
+	foreach my $host_view (@$host_entity_views) {
+		printf("%30s\n", $host_view->name);
+		$ESX->{$host_view->name} = {};
 	}
 
 }
@@ -44,18 +44,18 @@ sub get_esx_host_datastores {
 
 		$ESX->{$esxhost}->{datastores} = ();
 
-		my $host = Vim::find_entity_view(
+		my $host_view = Vim::find_entity_view(
 			view_type => 'HostSystem',
 			filter => {
 				'summary.config.name' => qr/${esxhost}/
 			}
 		);
 
-		for (my $i=0; $i < scalar(@{$host->config->fileSystemVolume->mountInfo}); $i++) {
+		for (my $i=0; $i < scalar(@{$host_view->config->fileSystemVolume->mountInfo}); $i++) {
 
-			my $ds_type = $host->config->fileSystemVolume->mountInfo->[$i]->volume->type;
-			my $ds_name = $host->config->fileSystemVolume->mountInfo->[$i]->volume->name;
-			my $ds_path = $host->config->fileSystemVolume->mountInfo->[$i]->mountInfo->path;
+			my $ds_type = $host_view->config->fileSystemVolume->mountInfo->[$i]->volume->type;
+			my $ds_name = $host_view->config->fileSystemVolume->mountInfo->[$i]->volume->name;
+			my $ds_path = $host_view->config->fileSystemVolume->mountInfo->[$i]->mountInfo->path;
 			if ($debug) { printf("processing datastore %s\n", $ds_name); }
 
 			if (!$ds_name or ($ds_type eq "other")) { next; }
@@ -70,9 +70,9 @@ sub get_esx_host_datastores {
 					printf("i: %3d, name: %s, path: %s\n", $i, $ds_name, $ds_path);
 				}
 
-				for (my $j=0; $j < scalar(@{$host->config->fileSystemVolume->mountInfo->[$i]->volume->extent}); $j++) {
-			     		if ($debug) { printf("extent: %s\n", $host->config->fileSystemVolume->mountInfo->[$i]->volume->extent->[$j]->diskName); }
-					push(@{$DATASTORE->{$ds_name}->{extents}}, $host->config->fileSystemVolume->mountInfo->[$i]->volume->extent->[$j]->diskName);
+				for (my $j=0; $j < scalar(@{$host_view->config->fileSystemVolume->mountInfo->[$i]->volume->extent}); $j++) {
+			     		if ($debug) { printf("extent: %s\n", $host_view->config->fileSystemVolume->mountInfo->[$i]->volume->extent->[$j]->diskName); }
+					push(@{$DATASTORE->{$ds_name}->{extents}}, $host_view->config->fileSystemVolume->mountInfo->[$i]->volume->extent->[$j]->diskName);
 					}
 				&get_datastore_vms(${esxhost}, ${ds_name});
 			}
@@ -115,7 +115,7 @@ sub get_datastore_vms {
 
 	if ($debug) { print "finding $ds_name...\n"; }
 
-	my $entity_views = Vim::find_entity_views(
+	my $datastore_entity_views = Vim::find_entity_views(
 		view_type => 'Datastore',
 		filter => { 
 			'summary.name' => qr/${ds_name}/ 
@@ -123,51 +123,51 @@ sub get_datastore_vms {
 	);
 
 
-	foreach my $entity_view (@$entity_views) { 
+	foreach my $datastore_view (@$datastore_entity_views) { 
 	
-		my $entity_name = $entity_view->summary->name;
+		#my $entity_name = $datastore_view->summary->name;
 
-		next, if (!$entity_view->vm);
+		next, if (!$datastore_view->vm);
 
-		for (my $i=0; $i < scalar(@{$entity_view->vm}); $i++) {
+		for (my $i=0; $i < scalar(@{$datastore_view->vm}); $i++) {
 
-			my $vm = Vim::get_view(mo_ref => $entity_view->vm->[$i]);
+			my $vm_view = Vim::get_view(mo_ref => $datastore_view->vm->[$i]);
 
 			#print LOG Dumper $vm;
 
-			next, if ($vm->config->template == 1);
-			next, if ($VM->{$vm->name});
+			next, if ($vm_view->config->template == 1);
+			next, if ($VM->{$vm_view->name});
 
-			if ($debug) { printf("processing VM: %s\n", $vm->name); }
-			if ($vm->name) { 
-				if ($debug) { printf("VM: %s\n", $vm->name); }
-				push(@{$DATASTORE->{$ds_name}->{vms}}, $vm->name);
-				$VM->{$vm->name} = {};
+			if ($debug) { printf("processing VM: %s\n", $vm_view->name); }
+			if ($vm_view->name) { 
+				if ($debug) { printf("VM: %s\n", $vm_view->name); }
+				push(@{$DATASTORE->{$ds_name}->{vms}}, $vm_view->name);
+				$VM->{$vm_view->name} = {};
 			}
-			if ($vm->guest->guestFullName) { 
-				if ($debug) { printf("\t%s\n", $vm->guest->guestFullName); }
-				$VM->{$vm->name}->{guestFullName} = $vm->guest->guestFullName;
+			if ($vm_view->guest->guestFullName) { 
+				if ($debug) { printf("\t%s\n", $vm_view->guest->guestFullName); }
+				$VM->{$vm_view->name}->{guestFullName} = $vm_view->guest->guestFullName;
 			}
-			if ($vm->guest->ipAddress) { 
-				if ($debug) { printf("\t%s\n", $vm->guest->ipAddress); }
-				$VM->{$vm->name}->{ipAddress} = $vm->guest->ipAddress;
+			if ($vm_view->guest->ipAddress) { 
+				if ($debug) { printf("\t%s\n", $vm_view->guest->ipAddress); }
+				$VM->{$vm_view->name}->{ipAddress} = $vm_view->guest->ipAddress;
 			}
 
-			if (!$vm->guest->disk) {
-				$VM->{$vm->name}->{non_datastore_resident} = $ds_name;
+			if (!$vm_view->guest->disk) {
+				$VM->{$vm_view->name}->{non_datastore_resident} = $ds_name;
 				next;
 			}
-			$VM->{$vm->name}->{datastore_resident} = $ds_name;
-			for (my $j=0; $j < scalar(@{$vm->guest->disk}); $j++) {
-				my $cap = &convert_capacity($vm->guest->disk->[$j]->capacity);
-				my $diskpath = $vm->guest->disk->[$j]->diskPath;
+			$VM->{$vm_view->name}->{datastore_resident} = $ds_name;
+			for (my $j=0; $j < scalar(@{$vm_view->guest->disk}); $j++) {
+				my $cap = &convert_capacity($vm_view->guest->disk->[$j]->capacity);
+				my $diskpath = $vm_view->guest->disk->[$j]->diskPath;
 				if ($debug) { printf("\t%s\t%s", $diskpath, $cap); }
-				$VM->{$vm->name}->{disks}->{$diskpath} = $cap;
+				$VM->{$vm_view->name}->{disks}->{$diskpath} = $cap;
 			}
-			if ($vm->config->extraConfig) {
-				foreach my $options (@{$vm->config->extraConfig}) {
+			if ($vm_view->config->extraConfig) {
+				foreach my $options (@{$vm_view->config->extraConfig}) {
 					if ($options->key eq "hbr_filter.rpo") {
-						$VM->{$vm->name}->{vsphere_rpo} = $options->value;
+						$VM->{$vm_view->name}->{vsphere_rpo} = $options->value;
 					}
 				}
 			}
